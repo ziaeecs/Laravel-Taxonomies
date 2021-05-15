@@ -32,34 +32,42 @@ trait HasTaxonomies
     }
 
     /**
-     * Add one or multiple terms in a given taxonomy.
+     * Add one or more terms in a given taxonomy.
      *
-     * @param mixed    $terms
-     * @param string   $taxonomy
-     * @param integer  $parent
-     * @param integer  $order
+     * @param  mixed  $term
+     * @param  string  $taxonomy
+     * @param  integer  $parent
+     * @param  integer  $order
      */
-    public function addTerm($terms, $taxonomy, $parent = 0, $order = 0)
+    public function addTerm($term, $taxonomy, $parent = 0, $order = 0)
     {
-        $terms = TaxableUtils::makeTermsArray($terms);
-
-        $this->createTaxables($terms, $taxonomy, $parent, $order);
-
-        $terms = Term::whereIn('name', $terms)->pluck('id')->all();
-
-        if (count($terms) > 0) {
-            foreach ($terms as $term) {
-                if ($this->taxonomies()->where('taxonomy', $taxonomy)->where('term_id', $term)->first())
-                    continue;
-
-                $tax = Taxonomy::where('term_id', $term)->first();
-                $this->taxonomies()->attach($tax->id);
+        if (!is_array($term) || (is_array($term) && TaxableUtils::isAssoc($term))) {
+            $this->addSignleTerm($term, $taxonomy, $parent, $order);
+        } else {
+            foreach ($term as $item) {
+                $this->addSignleTerm($item, $taxonomy, $parent, $order);
             }
+        }
+    }
 
+    private function addSignleTerm($term, $taxonomy, $parent = 0, $order = 0)
+    {
+        $term = TaxableUtils::makeTermMultilingual($term);
+
+        $term = TaxableUtils::createTerm($term);
+
+        $taxonomyModel = TaxableUtils::createTaxonomies($term, $taxonomy, $parent);
+
+        if ($this->taxonomies()->where('taxonomy', $taxonomy)->where('term_id', $term->id)->first()) {
             return;
         }
 
-        $this->taxonomies()->detach();
+        $this->taxonomies()->attach($taxonomyModel, [
+            'order' => $order,
+        ]);
+
+        $taxonomyModel->count++;
+        $taxonomyModel->save();
     }
 
     /**
@@ -67,25 +75,18 @@ trait HasTaxonomies
      *
      * @param  integer  $taxonomy_id
      */
-    public function setCategory($taxonomy_id)
+    public function setCategory($taxonomy_id, $order = 0)
     {
-        $this->taxonomies()->attach($taxonomy_id);
-    }
+        $taxonomy = Taxonomy::find($taxonomy_id);
 
-    /**
-     * Create terms and taxonomies (taxables).
-     *
-     * @param mixed    $terms
-     * @param string   $taxonomy
-     * @param integer  $parent
-     * @param integer  $order
-     */
-    public function createTaxables($terms, $taxonomy, $parent = 0, $order = 0)
-    {
-        $terms = TaxableUtils::makeTermsArray($terms);
+        if ($taxonomy && !$this->taxed()->where('taxonomy_id', $taxonomy_id)->first()) {
+            $this->taxonomies()->attach($taxonomy_id, [
+                'order' => $order,
+            ]);
 
-        TaxableUtils::createTerms($terms);
-        TaxableUtils::createTaxonomies($terms, $taxonomy, $parent, $order);
+            $taxonomy->count++;
+            $taxonomy->save();
+        }
     }
 
     /**
@@ -107,8 +108,9 @@ trait HasTaxonomies
      */
     public function getTermNames($taxonomy = '')
     {
-        if ($terms = $this->getTerms($taxonomy))
-            $terms->pluck('name');
+        if ($terms = $this->getTerms($taxonomy)) {
+            return $terms->pluck('name->'.app()->getLocale());
+        }
 
         return null;
     }
@@ -116,7 +118,7 @@ trait HasTaxonomies
     /**
      * Get the terms related to a given taxonomy.
      *
-    * @param  string  $taxonomy
+     * @param  string  $taxonomy
      * @return mixed
      */
     public function getTerms($taxonomy = '')
@@ -134,18 +136,20 @@ trait HasTaxonomies
      * Get a term model by the given name and optionally a taxonomy.
      *
      * @param  string  $term_name
-    * @param  string  $taxonomy
+     * @param  string  $taxonomy
      * @return mixed
      */
-    public function getTerm($term_name, $taxonomy = '')
+    public function getTerm($term_name, $taxonomy = '', $locale = null)
     {
+        $locale = $locale ?: app()->getLocale();
+
         if ($taxonomy) {
             $term_ids = $this->taxonomies->where('taxonomy', $taxonomy)->pluck('term_id');
         } else {
             $term_ids = $this->getTaxonomies('term_id');
         }
 
-        return Term::whereIn('id', $term_ids)->where('name', $term_name)->first();
+        return Term::whereIn('id', $term_ids)->where('name->'.$locale, $term_name)->first();
     }
 
     /**
@@ -155,9 +159,11 @@ trait HasTaxonomies
      * @param  string  $taxonomy
      * @return boolean
      */
-    public function hasTerm($term_name, $taxonomy = '')
+    public function hasTerm($term_name, $taxonomy = '', $locale = null)
     {
-        return (bool) $this->getTerm($term_name, $taxonomy);
+        $locale = $locale ?: app()->getLocale();
+
+        return (bool) $this->getTerm($term_name, $taxonomy, $locale);
     }
 
     /**
@@ -167,10 +173,13 @@ trait HasTaxonomies
      * @param  string  $taxonomy
      * @return mixed
      */
-    public function removeTerm($term_name, $taxonomy = '')
+    public function removeTerm($term_name, $taxonomy = '', $locale = null)
     {
-        if (! $term = $this->getTerm($term_name, $taxonomy))
+        $locale = $locale ?: app()->getLocale();
+
+        if (!$term = $this->getTerm($term_name, $taxonomy, $locale)) {
             return null;
+        }
 
         if ($taxonomy) {
             $taxonomy = $this->taxonomies->where('taxonomy', $taxonomy)->where('term_id', $term->id)->first();
@@ -195,16 +204,17 @@ trait HasTaxonomies
      * Scope by given terms.
      *
      * @param  object  $query
-     * @param  array   $terms
+     * @param  array  $terms
      * @param  string  $taxonomy
      * @return mixed
      */
-    public function scopeWithTerms($query, $terms, $taxonomy)
+    public function scopeWithTerms($query, $terms, $taxonomy, $locale = null)
     {
-        $terms = TaxableUtils::makeTermsArray($terms);
+        $locale = $locale ?: app()->getLocale();
 
-        foreach ($terms as $term)
-            $this->scopeWithTerm($query, $term, $taxonomy);
+        foreach ($terms as $term) {
+            $this->scopeWithTerm($query, $term, $taxonomy, $locale);
+        }
 
         return $query;
     }
@@ -217,14 +227,15 @@ trait HasTaxonomies
      * @param  string  $taxonomy
      * @return mixed
      */
-    public function scopeWithTerm($query, $term_name, $taxonomy)
+    public function scopeWithTerm($query, $term_name, $taxonomy, $locale = null)
     {
+        $locale = $locale ?: app()->getLocale();
+
         $term_ids = Taxonomy::where('taxonomy', $taxonomy)->pluck('term_id');
 
-        $term     = Term::whereIn('id', $term_ids)->where('name', $term_name)->first();
-        $taxonomy = Taxonomy::where('term_id', $term->id)->first();
+        $term = Term::whereIn('id', $term_ids)->where('name->'.$locale, $term_name)->first();
 
-        return $query->whereHas('taxonomies', function($q) use($term, $taxonomy) {
+        return $query->whereHas('taxonomies', function ($q) use ($term) {
             $q->where('term_id', $term->id);
         });
     }
@@ -237,14 +248,17 @@ trait HasTaxonomies
      * @param  string  $taxonomy
      * @return mixed
      */
-    public function scopeWithTax($query, $term_name, $taxonomy)
+    public function scopeWithTax($query, $term_name, $taxonomy, $locale = null)
     {
+        $locale = $locale ?: app()->getLocale();
+
         $term_ids = Taxonomy::where('taxonomy', $taxonomy)->pluck('term_id');
 
-        $term     = Term::whereIn('id', $term_ids)->where('name', $term_name)->first();
+        $term = Term::whereIn('id', $term_ids)->where('name->'.$locale, $term_name)->first();
+
         $taxonomy = Taxonomy::where('term_id', $term->id)->first();
 
-        return $query->whereHas('taxed', function($q) use($term, $taxonomy) {
+        return $query->whereHas('taxed', function ($q) use ($taxonomy) {
             $q->where('taxonomy_id', $taxonomy->id);
         });
     }
@@ -252,13 +266,13 @@ trait HasTaxonomies
     /**
      * Scope by category id.
      *
-     * @param  object   $query
+     * @param  object  $query
      * @param  integer  $taxonomy_id
      * @return mixed
      */
     public function scopeHasCategory($query, $taxonomy_id)
     {
-        return $query->whereHas('taxed', function($q) use($taxonomy_id) {
+        return $query->whereHas('taxed', function ($q) use ($taxonomy_id) {
             $q->where('taxonomy_id', $taxonomy_id);
         });
     }
@@ -267,12 +281,12 @@ trait HasTaxonomies
      * Scope by category ids.
      *
      * @param  object  $query
-     * @param  array   $taxonomy_ids
+     * @param  array  $taxonomy_ids
      * @return mixed
      */
     public function scopeHasCategories($query, $taxonomy_ids)
     {
-        return $query->whereHas('taxed', function($q) use($taxonomy_ids) {
+        return $query->whereHas('taxed', function ($q) use ($taxonomy_ids) {
             $q->whereIn('taxonomy_id', $taxonomy_ids);
         });
     }

@@ -17,9 +17,9 @@ class Taxonomy extends Model
     protected $fillable = [
         'term_id',
         'taxonomy',
-        'desc',
+        'description',
         'parent',
-        'sort',
+        'count',
     ];
 
     /**
@@ -42,7 +42,8 @@ class Taxonomy extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function term() {
+    public function term()
+    {
         return $this->belongsTo(Term::class);
     }
 
@@ -94,12 +95,19 @@ class Taxonomy extends Model
      * @param  object  $query
      * @param  string  $term
      * @param  string  $taxonomy
+     * @param  null|string  $locale
      * @return mixed
      */
-    public function scopeTerm($query, $term, $taxonomy = 'major')
+    public function scopeTerm($query, $term, $taxonomy = null, $locale = null)
     {
-        return $query->whereHas('term', function($q) use($term, $taxonomy) {
-            $q->where('name', $term);
+        $locale = $locale ?: app()->getLocale();
+
+        if ($taxonomy) {
+            $query->taxonomy($taxonomy);
+        }
+
+        return $query->whereHas('term', function ($q) use ($term, $taxonomy, $locale) {
+            $q->where('name->', $locale, $term);
         });
     }
 
@@ -109,12 +117,19 @@ class Taxonomy extends Model
      * @param  object  $query
      * @param  string  $searchTerm
      * @param  string  $taxonomy
+     * @param  null|string  $locale
      * @return mixed
      */
-    public function scopeSearch($query, $searchTerm, $taxonomy = 'major')
+    public function scopeSearch($query, $searchTerm, $taxonomy = null, $locale = null)
     {
-        return $query->whereHas('term', function($q) use($searchTerm, $taxonomy) {
-            $q->where('name', 'like', '%'. $searchTerm .'%');
+        $locale = $locale ?: app()->getLocale();
+
+        if ($taxonomy) {
+            $query->taxonomy($taxonomy);
+        }
+
+        return $query->whereHas('term', function ($q) use ($searchTerm, $taxonomy, $locale) {
+            $q->where('name->'.$locale, 'like', '%'.$searchTerm.'%');
         });
     }
 }

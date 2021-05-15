@@ -1,9 +1,10 @@
 <?php namespace Lecturize\Taxonomies\Models;
 
-use Cviebrock\EloquentSluggable\Sluggable;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Sluggable\HasTranslatableSlug;
+use Spatie\Sluggable\SlugOptions;
+use Spatie\Translatable\HasTranslations;
 
 /**
  * Class Term
@@ -11,8 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Term extends Model
 {
-    use Sluggable;
-    use SoftDeletes;
+    use HasTranslations, HasTranslatableSlug, SoftDeletes;
+
+    protected $translatable = [
+        'name',
+        'slug',
+    ];
 
     /**
      * @inheritdoc
@@ -38,21 +43,20 @@ class Term extends Model
     }
 
     /**
-     * @inheritdoc
+     * Get the options for generating the slug.
      */
-    public function sluggable()
+    public function getSlugOptions(): SlugOptions
     {
-        return [
-            'slug' => [
-                'source' => 'name'
-            ]
-        ];
+        return SlugOptions::create()
+            ->generateSlugsFrom('name')
+            ->saveSlugsTo('slug');
     }
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\MorphMany
      */
-    public function taxable() {
+    public function taxable()
+    {
         return $this->morphMany(Taxable::class, 'taxable');
     }
 
@@ -61,26 +65,9 @@ class Term extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
-    public function taxonomies() {
-        return $this->hasMany(Taxonomy::class);
-    }
-
-    /**
-     * Get display name.
-     *
-     * @param  string  $locale
-     * @param  int     $limit
-     * @return mixed
-     */
-    public function getDisplayName($locale = '', $limit = 0)
+    public function taxonomies()
     {
-        $locale = $locale ?: app()->getLocale();
-
-        $property_with_locale = $locale === 'en' ? "name" : "name_$locale";
-
-        $name = property_exists($this, $property_with_locale) ? $this->{$property_with_locale} : $this->name;
-
-        return $limit > 0 ? str_limit($name, $limit) : $name;
+        return $this->hasMany(Taxonomy::class);
     }
 
     /**
@@ -89,12 +76,14 @@ class Term extends Model
      * @param  string  $taxonomy
      * @return mixed
      */
-    public function getRouteParameters($taxonomy)
+    public function getRouteParameters($taxonomy, $locale = null)
     {
+        $locale = $locale ?: app()->getLocale();
+
         $taxonomy = Taxonomy::taxonomy($taxonomy)
-                            ->term($this->name)
-                            ->with('parent')
-                            ->first();
+            ->term($this->name, $locale)
+            ->with('parent')
+            ->first();
 
         $parameters = $this->getParentSlugs($taxonomy);
 
@@ -107,15 +96,16 @@ class Term extends Model
      * Get slugs of parent terms.
      *
      * @param  Taxonomy  $taxonomy
-     * @param  array     $parameters
+     * @param  array  $parameters
      * @return array
      */
     function getParentSlugs(Taxonomy $taxonomy, $parameters = [])
     {
         array_push($parameters, $taxonomy->term->slug);
 
-        if (($parents = $taxonomy->parent()) && ($parent = $parents->first()))
+        if (($parents = $taxonomy->parent()) && ($parent = $parents->first())) {
             return $this->getParentSlugs($parent, $parameters);
+        }
 
         return $parameters;
     }

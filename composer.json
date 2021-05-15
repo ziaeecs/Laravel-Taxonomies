@@ -1,7 +1,7 @@
 {
     "name": "lecturize/laravel-taxonomies",
     "description": "Simple, nestable Terms & Taxonomies (similar to WordPress) for Laravel 5.",
-    "homepage" : "https://github.com/Lecturize/Laravel-Taxonomies",
+    "homepage": "https://github.com/Lecturize/Laravel-Taxonomies",
     "license": "MIT",
     "type": "library",
     "keywords": [
@@ -15,27 +15,28 @@
     ],
     "authors": [
         {
-            "name"     : "Alexander Manfred Poellmann",
-            "homepage" : "http://twitter.com/AMPoellmann",
-            "role"     : "developer"
+            "name": "Alexander Manfred Poellmann",
+            "homepage": "http://twitter.com/AMPoellmann",
+            "role": "developer"
         }
     ],
     "require": {
-        "php"                 : ">=7.2",
-        "illuminate/support"  : ">=6.0",
-        "illuminate/database" : ">=6.0",
-        "cviebrock/eloquent-sluggable" : "^6.0"
+        "php": ">=7.2",
+        "illuminate/support": ">=6.0",
+        "illuminate/database": ">=6.0",
+        "spatie/laravel-sluggable": "^2.6",
+        "spatie/laravel-translatable": "^4.5"
     },
     "require-dev": {
-        "laravel/framework"      : "^6.0",
-        "mockery/mockery"        : "~1.0",
-        "phpunit/phpunit"        : "^9.4",
-        "orchestra/testbench"    : "^4.10",
-        "doctrine/dbal"          : "^2.12"
+        "laravel/framework": "^6.0",
+        "mockery/mockery": "~1.0",
+        "phpunit/phpunit": "^9.4",
+        "orchestra/testbench": "^4.10",
+        "doctrine/dbal": "^2.12"
     },
     "autoload": {
         "psr-4": {
-            "Lecturize\\Taxonomies\\" : "src"
+            "Lecturize\\Taxonomies\\": "src"
         }
     },
     "autoload-dev": {
@@ -46,7 +47,6 @@
     "scripts": {
         "taxonomies": "vendor/bin/phpunit",
         "taxonomies-coverage": "vendor/bin/phpunit --coverage-html coverage"
-
     },
     "config": {
         "sort-packages": true
@@ -60,12 +60,14 @@
                 "Taxonomy": "Lecturize\\Taxonomies\\Facades\\Taxonomy"
             }
         },
-        "branch-alias" : {
-            "dev-master" : "0.0.x-dev"
+        "branch-alias": {
+            "dev-master": "0.0.x-dev"
         }
     },
-    "support" : {
-        "source" : "https://github.com/Lecturize/Laravel-Taxonomies",
-        "issues" : "https://github.com/Lecturize/Laravel-Taxonomies/issues"
-    }
+    "support": {
+        "source": "https://github.com/Lecturize/Laravel-Taxonomies",
+        "issues": "https://github.com/Lecturize/Laravel-Taxonomies/issues"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
 }

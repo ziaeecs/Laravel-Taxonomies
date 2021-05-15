@@ -10,81 +10,65 @@ use Lecturize\Taxonomies\Models\Term;
 class TaxableUtils
 {
     /**
-     * @param mixed    $terms
-     * @param string   $taxonomy
-     * @param integer  $parent
-     * @param integer  $order
+     * @param  string|array  $terms
+     * @return array
      */
-    public function createTaxables($terms, $taxonomy, $parent = 0, $order = 0)
-     {
-          $terms = $this->makeTermsArray($terms);
+    public static function makeTermMultilingual($term)
+    {
+        if (is_array($term)) {
+            return $term;
+        }
 
-          $this->createTerms($terms);
-          $this->createTaxonomies($terms, $taxonomy, $parent, $order);
-     }
+        return [
+            app()->getLocale() => $term,
+        ];
+    }
 
     /**
-     * @param array $terms
+     * @param  array  $terms
      */
-    public static function createTerms(array $terms)
-     {
-          if (count($terms) > 0) {
-               $found = Term::whereIn('name', $terms)->pluck('name')->all();
+    public static function createTerm(array $term)
+    {
+        $found = Term::whereRaw('name = cast(? as json)', json_encode($term))->first();
 
-               if (! is_array($found))
-                    $found = [];
+        if ($found) {
+            return $found;
+        }
 
-               foreach (array_diff($terms, $found) as $name) {
-                    if (Term::where('name', $name)->first())
-                         continue;
+        $newTerm = new Term;
+        $newTerm->name = $term;
+        $newTerm->save();
 
-                    $term = new Term;
-                    $term->name = $name;
-                    $term->save();
-               }
-          }
-     }
+        return $newTerm;
+    }
 
     /**
-     * @param array    $terms
-     * @param string   $taxonomy
-     * @param integer  $parent
-     * @param integer  $order
+     * @param  Term  $term
+     * @param  string  $taxonomy
+     * @param  integer  $parent
+     * @param  integer  $order
      */
-    public static function createTaxonomies(array $terms, $taxonomy, $parent = 0, $order = 0)
-     {
-          if (count($terms) > 0) {
-               // only keep terms with existing entries in terms table
-               $terms = Term::whereIn('name', $terms)->pluck('name')->all();
+    public static function createTaxonomies(Term $term, $taxonomy, $parent = 0)
+    {
+        if ($tax = Taxonomy::where('taxonomy', $taxonomy)->where('term_id', $term->id)->where('parent',
+            $parent)->first()) {
+            return $tax;
+        }
 
-               // create taxonomy entries for given terms
-               foreach ($terms as $term) {
-                    $term_id = Term::where('name', $term)->first()->id;
+        $model = new Taxonomy;
+        $model->taxonomy = $taxonomy;
+        $model->term_id = $term->id;
+        $model->parent = $parent;
+        $model->save();
 
-                    if (Taxonomy::where('taxonomy', $taxonomy)->where('term_id', $term_id)->where('parent', $parent)->where('sort', $order)->first())
-                         continue;
+        return $model;
+    }
 
-                    $model = new Taxonomy;
-                    $model->taxonomy = $taxonomy;
-                    $model->term_id  = $term_id;
-                    $model->parent   = $parent;
-                    $model->sort     = $order;
-                    $model->save();
-               }
-          }
-     }
-
-     /**
-      * @param  string|array  $terms
-      * @return array
-      */
-     public static function makeTermsArray($terms) {
-          if (is_array($terms)) {
-               return $terms;
-          } else if (is_string($terms)) {
-               return explode('|', $terms);
-          }
-
-          return (array) $terms;
-     }
+    public static function isAssoc(array $arr)
+    {
+        if (array() === $arr) {
+            return false;
+        }
+        return array_keys($arr) !== range(0, count($arr) - 1);
+    }
 }

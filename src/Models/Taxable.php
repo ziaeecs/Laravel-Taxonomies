@@ -14,7 +14,8 @@ class Taxable extends Model
     protected $fillable = [
         'taxonomy_id',
         'taxable_id',
-        'taxable_type'
+        'taxable_type',
+        'order',
     ];
 
     /**
@@ -24,7 +25,7 @@ class Taxable extends Model
     {
         parent::__construct($attributes);
 
-        $this->table = config('lecturize.taxonomies.table_pivot','taxables');
+        $this->table = config('lecturize.taxonomies.table_pivot', 'taxables');
     }
 
     /**

@@ -8,30 +8,30 @@ class TaxonomiesServiceProvider extends ServiceProvider
         'CreateTaxonomiesTable' => 'create_taxonomies_table'
     ];
 
-     /**
+    /**
      * @inheritdoc
-      */
-     public function boot()
-     {
+     */
+    public function boot()
+    {
         $this->handleConfig();
         $this->handleMigrations();
-     }
+    }
 
-     /**
+    /**
      * @inheritdoc
-      */
-     public function register()
-     {
-         //
-     }
+     */
+    public function register()
+    {
+        //
+    }
 
-     /**
+    /**
      * @inheritdoc
-      */
-     public function provides()
-     {
-          return [];
-     }
+     */
+    public function provides()
+    {
+        return [];
+    }
 
     /**
      * Publish and merge the config file.
@@ -40,11 +40,11 @@ class TaxonomiesServiceProvider extends ServiceProvider
      */
     private function handleConfig()
     {
-        $configPath = __DIR__ . '/../config/config.php';
+        $configPath = __DIR__.'/../config/config.php';
 
-        $this->publishes([$configPath => config_path('lecturize.php')]);
+        $this->publishes([$configPath => config_path('taxonomy.php')]);
 
-        $this->mergeConfigFrom($configPath, 'lecturize');
+        $this->mergeConfigFrom($configPath, 'taxonomy');
     }
 
     /**
@@ -54,13 +54,15 @@ class TaxonomiesServiceProvider extends ServiceProvider
      */
     private function handleMigrations()
     {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations/');
+
         foreach ($this->migrations as $class => $file) {
-            if (! class_exists($class)) {
+            if (!class_exists($class)) {
                 $timestamp = date('Y_m_d_His', time());
 
                 $this->publishes([
-                    __DIR__ .'/../database/migrations/'. $file .'.php.stub' =>
-                        database_path('migrations/'. $timestamp .'_'. $file .'.php')
+                    __DIR__.'/../database/migrations/'.$file.'.php' =>
+                        database_path('migrations/'.$timestamp.'_'.$file.'.php')
                 ], 'migrations');
             }
         }
